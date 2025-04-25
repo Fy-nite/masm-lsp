@@ -1,1 +1,1 @@
-{"root":["./src/completion.ts","./src/formatting.ts","./src/server.ts","./src/validation.ts"],"version":"5.8.2"}
+{"root":["./src/completion.ts","./src/formatting.ts","./src/mnispec.ts","./src/server.ts","./src/toolchain.ts","./src/validation.ts"],"version":"5.8.2"}

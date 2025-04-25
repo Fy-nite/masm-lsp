@@ -19,5 +19,17 @@
 	"devDependencies": {
 		"@types/vscode": "^1.75.1",
 		"@vscode/test-electron": "^2.3.9"
-	}
+	},
+	"contributes": {
+		"commands": [
+			{
+				"command": "extension.selectMicroASMToolchain",
+				"title": "MicroASM: Select Toolchain"
+			}
+		]
+	},
+	"activationEvents": [
+		"onLanguage:microasm",
+		"onCommand:extension.selectMicroASMToolchain"
+	]
 }

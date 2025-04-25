@@ -1,0 +1,6 @@
+{
+  "Math": {
+    "sin": { "args": ["register", "register"] },
+    "cos": { "args": ["register", "register"] }
+  }
+}

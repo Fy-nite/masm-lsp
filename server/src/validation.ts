@@ -1,4 +1,5 @@
 import { Diagnostic, DiagnosticSeverity, TextDocument } from 'vscode-languageserver';
+import type { MNISpecMap } from './mniSpec';
 
 export async function validateTextDocument(
 	textDocument: TextDocument,
@@ -9,11 +10,13 @@ export async function validateTextDocument(
 	memoryAddressRegex: RegExp,
 	knownInstructions: Set<string>,
 	instructionArgCounts: Record<string, { min: number, max: number }>,
+
 	registerRegex: RegExp,
 	knownRegisters: Set<string>,
 	labelRegex: RegExp,
 	jumpInstructions: Set<string>,
-	findClosestMatch: (input: string, options: Iterable<string>, maxDistance?: number) => string | null
+	findClosestMatch: (input: string, options: Iterable<string>, maxDistance?: number) => string | null,
+	mniSpecMap: MNISpecMap // Add mniSpecMap: MNISpecMap as an argument to validateTextDocument
 ): Promise<Diagnostic[]> {
 	// Use default settings as a fallback if settings resolve to null/undefined
 	const settings = await getDocumentSettings(textDocument.uri) ?? defaultSettings;
@@ -291,10 +294,55 @@ export async function validateTextDocument(
 			unreachableStartLine = i;
 			unreachableStartInstr = instruction;
 		}
+
+		// Add MNI specific checks
+		if (instruction === 'MNI' && args.length > 0) {
+			const funcName = args[0]; // e.g., Math.sin
+			const spec = mniSpecMap.get(funcName);
+			if (!spec) {
+				diagnostics.push({
+					severity: DiagnosticSeverity.Error,
+					range: { start: { line: i, character: line.indexOf(funcName) }, end: { line: i, character: line.indexOf(funcName) + funcName.length } },
+					message: `Unknown MNI function: ${funcName}`,
+					source: 'microasm-ls'
+				});
+			} else {
+				// Check argument count
+				const expected = spec.args.length;
+				const got = args.length - 1;
+				if (got !== expected) {
+					diagnostics.push({
+						severity: DiagnosticSeverity.Error,
+						range: { start: { line: i, character: 0 }, end: { line: i, character: line.length } },
+						message: `MNI ${funcName} expects ${expected} arguments, got ${got}.`,
+						source: 'microasm-ls'
+					});
+				} else {
+					// Optionally check argument types
+					for (let k = 0; k < expected; k++) {
+						const expectedType = spec.args[k];
+						const actualArg = args[k + 1];
+						let typeOk = false;
+						if (expectedType === 'register' && registerRegex.test(actualArg)) {typeOk = true;}
+						if (expectedType === 'memory' && memoryAddressRegex.test(actualArg)) {typeOk = true;}
+						// Add more types as needed
+						if (!typeOk) {
+							diagnostics.push({
+								severity: DiagnosticSeverity.Error,
+								range: { start: { line: i, character: line.indexOf(actualArg) }, end: { line: i, character: line.indexOf(actualArg) + actualArg.length } },
+								message: `Argument ${k + 1} of MNI ${funcName} expects ${expectedType}, got '${actualArg}'.`,
+								source: 'microasm-ls'
+							});
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// --- Unused Symbols ---
 	for (const [label, def] of allLabels) {
+		if (label === 'main') {continue;} // Exclude 'main' label from unused check
 		if (!referencedLabels.has(label)) {
 			diagnostics.push({
 				severity: DiagnosticSeverity.Warning,

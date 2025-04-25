@@ -34,6 +34,11 @@ import { URI } from 'vscode-uri';
 import { formatDocument } from './formatting';
 import { provideCompletion } from './completion';
 import { validateTextDocument } from './validation';
+import { findToolchain } from './toolchain';
+import { loadMNISpecs } from './mniSpec';
+
+const mniSpecDir = path.join(__dirname, '..', 'mni-specs');
+const mniSpecMap = loadMNISpecs(mniSpecDir);
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -324,7 +329,8 @@ connection.languages.diagnostics.on(async (params) => {
 				knownRegisters,
 				labelRegex,
 				jumpInstructions,
-				findClosestMatch
+				findClosestMatch,
+				mniSpecMap // Pass mniSpecMap to validation
 			)
 		} satisfies DocumentDiagnosticReport;
 	} else {
@@ -353,7 +359,8 @@ documents.onDidChangeContent(change => {
 		knownRegisters,
 		labelRegex,
 		jumpInstructions,
-		findClosestMatch
+		findClosestMatch,
+		mniSpecMap // <-- add this argument
 	);
 });
 
@@ -362,7 +369,22 @@ connection.onDidChangeWatchedFiles(_change => {
 	connection.console.log('Watched file changed, clearing parsed document cache.');
 	parsedDocCache.clear();
 	// Trigger revalidation of open documents
-	documents.all().forEach(async doc => await validateTextDocument(doc, async (uri) => await getDocumentSettings(uri), defaultSettings, getParsedDocInfo, includeRegex, memoryAddressRegex, knownInstructions, instructionArgCounts, registerRegex, knownRegisters, labelRegex, jumpInstructions, findClosestMatch));
+	documents.all().forEach(async doc => await validateTextDocument(
+		doc,
+		async (uri) => await getDocumentSettings(uri),
+		defaultSettings,
+		getParsedDocInfo,
+		includeRegex,
+		memoryAddressRegex,
+		knownInstructions,
+		instructionArgCounts,
+		registerRegex,
+		knownRegisters,
+		labelRegex,
+		jumpInstructions,
+		findClosestMatch,
+		mniSpecMap // <-- add this argument
+	));
 });
 
 // Recursive function to parse a document and its includes

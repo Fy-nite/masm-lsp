@@ -1,0 +1,6 @@
+{
+  "name": "MicroASM Toolchain",
+  "version": "1.0.0",
+  "includesDir": "includes",
+  "mniSpecsDir": "mni-specs"
+}
