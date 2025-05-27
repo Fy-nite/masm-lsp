@@ -209,7 +209,7 @@ const knownInstructions = new Set([
 	'JNE', 'JG', 'JLE', 'JGE',                // Flow Control Ext
 	'ENTER', 'LEAVE',                        // Stack Frame
 	'COPY', 'FILL', 'CMP_MEM',               // String/Memory
-	'MNI'                                    // MNI
+	'MNI','RET'                                    // MNI
 ].map(instr => instr.toUpperCase()));
 
 // Instructions that take a label argument (potentially)
