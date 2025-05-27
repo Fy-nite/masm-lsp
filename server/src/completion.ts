@@ -5,7 +5,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-// Export your completion handler as a function
+
 export async function provideCompletion(
 	textDocumentPosition: TextDocumentPositionParams,
 	documents: any,

@@ -1,0 +1,18 @@
+; Test file for invalid memory addressing patterns
+; These should produce validation errors
+
+MOV RAX $[            ; Invalid: unclosed bracket
+MOV RBX $]            ; Invalid: no opening bracket  
+MOV RCX $[]           ; Invalid: empty brackets
+MOV RDX $[+4]         ; Invalid: starts with operator
+MOV RSI $[RBP-]       ; Invalid: ends with operator
+MOV RDI $[RBP*]       ; Invalid: scale without register
+MOV RAX $[RBP*9]      ; Invalid: scale factor > 8
+MOV RBX $[INVALID]    ; Invalid: unknown register
+MOV RCX $[RBP++4]     ; Invalid: double operators
+MOV RDX $[4-RBP-]     ; Invalid: ends with operator
+
+; Valid patterns for comparison
+MOV RAX $[RBP-4]      ; Valid
+MOV RBX $123          ; Valid simple address
+MOV RCX $[RSP]        ; Valid register indirect

@@ -1,0 +1,43 @@
+; Comprehensive test file to verify both comment parsing and memory addressing fixes
+; ==========================================================================
+
+; Test 1: Comment Parsing Fix
+; Before fix: "OUT expects 2 arguments, but got 6" 
+; After fix: Should correctly identify 2 arguments (1 and $[RSP+4])
+OUT 1 $[RSP+4] ; Output stack value - this comment should be ignored
+
+; Test 2: Multiple instructions with comments
+MOV RAX 1      ; Move immediate value to RAX register
+ADD RAX RBX    ; Add RBX to RAX - should not cause extra argument errors  
+SUB RCX 5      ; Subtract 5 from RCX - comment parsing test
+
+; Test 3: Memory Addressing Validation (should all work)
+MOV $123 RAX           ; Simple numeric address
+MOV $[RBP] RBX         ; Register indirect
+MOV $[RBP-4] RCX       ; Register with negative displacement
+MOV $[RAX+8] RDX       ; Register with positive displacement  
+MOV $[RBX+RCX*2] RSI   ; Base + index*scale
+MOV $[RSP+RDI*4+16] RAX ; Complex addressing
+
+; Test 4: Invalid Memory Addressing (should show errors)
+MOV $[INVALID] RAX     ; Error: Invalid register name
+MOV $[RAX*9] RBX       ; Error: Scale factor > 8
+MOV $[RBP+] RCX        ; Error: Incomplete expression
+MOV $[] RDX            ; Error: Empty brackets
+MOV $[+4] RSI          ; Error: Starts with operator
+
+; Test 5: Mixed valid/invalid with comments
+MOV $[RBP-8] RAX ; This should work fine
+MOV $[BADREGS] RBX ; This should show an error for invalid register
+ADD RAX RBX ; This should work with 2 args, comment ignored
+
+; Test 6: Edge cases
+DB $200 "Test String"  ; DB with memory address
+LBL MAIN               ; Label definition
+  PUSH $[RBP-4]        ; Push with memory addressing
+  POP RAX              ; Pop to register
+  JMP #MAIN            ; Jump to label
+HLT                    ; Halt - should mark code below as unreachable
+
+; This code should be marked as unreachable
+MOV RAX 999

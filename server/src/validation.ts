@@ -1,5 +1,7 @@
 import { Diagnostic, DiagnosticSeverity, TextDocument } from 'vscode-languageserver';
 import type { MNISpecMap } from './mniSpec';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export async function validateTextDocument(
 	textDocument: TextDocument,
@@ -8,19 +10,33 @@ export async function validateTextDocument(
 	getParsedDocInfo: (doc: TextDocument, includePath: string | undefined) => Promise<any>,
 	includeRegex: RegExp,
 	memoryAddressRegex: RegExp,
+	isValidMemoryAddress: (address: string) => boolean, // Add the new validation function
 	knownInstructions: Set<string>,
 	instructionArgCounts: Record<string, { min: number, max: number }>,
-
 	registerRegex: RegExp,
 	knownRegisters: Set<string>,
 	labelRegex: RegExp,
 	jumpInstructions: Set<string>,
 	findClosestMatch: (input: string, options: Iterable<string>, maxDistance?: number) => string | null,
-	mniSpecMap: MNISpecMap // Add mniSpecMap: MNISpecMap as an argument to validateTextDocument
+	mniSpecMap: MNISpecMap,
+	toolchainPath: string | undefined // Pass toolchainPath as an argument
 ): Promise<Diagnostic[]> {
 	// Use default settings as a fallback if settings resolve to null/undefined
 	const settings = await getDocumentSettings(textDocument.uri) ?? defaultSettings;
-	const configuredIncludePath = settings.includePath; // Get configured path
+	let configuredIncludePath = settings.includePath; // Get configured path
+
+	// Check if a toolchainPath is provided and read its includePath
+	if (toolchainPath && fs.existsSync(toolchainPath)) {
+		try {
+			const tmasContent = JSON.parse(fs.readFileSync(toolchainPath, 'utf-8'));
+			if (tmasContent.includePath) {
+				configuredIncludePath = path.resolve(path.dirname(toolchainPath), tmasContent.includePath);
+			}
+		} catch (error: any) {
+			console.error(`Failed to read or parse MicroASM.tmas file: ${error.message}`);
+		}
+	}
+
 	const text = textDocument.getText();
 	const lines = text.split(/\r?\n/g);
 	const diagnostics: Diagnostic[] = [];
@@ -40,6 +56,12 @@ export async function validateTextDocument(
 	let unreachable = false; // Track unreachable code after HLT/JMP/EXIT
 	let unreachableStartLine: number | null = null;
 	let unreachableStartInstr: string | null = null;
+
+	// Helper function to strip comments from a line
+	function stripComment(line: string): string {
+		const commentIndex = line.indexOf(';');
+		return commentIndex !== -1 ? line.substring(0, commentIndex).trim() : line;
+	}
 
 	// --- Validate instructions, arguments, and references using combined symbols ---
 	for (let i = 0; i < lines.length && problems < settings.maxNumberOfProblems; i++) {
@@ -61,7 +83,9 @@ export async function validateTextDocument(
 		}
 
 		// --- Pass 1 Logic (Redefinitions, Format) ---
-		const tokensForPass1 = line.split(/\s+/);
+		const codeLineForPass1 = stripComment(line);
+		const tokensForPass1 = codeLineForPass1.split(/\s+/).filter(token => token.length > 0);
+		if (tokensForPass1.length === 0) continue; // Skip if no tokens after comment removal
 		const instructionForPass1 = tokensForPass1[0].toUpperCase();
 		const instructionStartIndexForPass1 = lines[i].indexOf(tokensForPass1[0]);
 
@@ -96,13 +120,13 @@ export async function validateTextDocument(
 				const stringLiteral = lines[i].substring(stringPartIndex).trim();
 				const definition = allDbAddresses.get(addressArg);
 
-				if (!memoryAddressRegex.test(addressArg)) {
+				if (!isValidMemoryAddress(addressArg)) {
 					// Invalid format (Error)
 					problems++;
 					diagnostics.push({
 						severity: DiagnosticSeverity.Error,
 						range: { start: { line: i, character: lines[i].indexOf(addressArg) }, end: { line: i, character: lines[i].indexOf(addressArg) + addressArg.length } },
-						message: `Invalid DB address format: ${addressArg}. Expected $number.`, source: 'microasm-ls'
+						message: `Invalid DB address format: ${addressArg}. Expected $number or $[expression].`, source: 'microasm-ls'
 					});
 				} else if (!stringLiteral.startsWith('"') || !stringLiteral.endsWith('"')) {
 					// Invalid string format (Error)
@@ -127,7 +151,10 @@ export async function validateTextDocument(
 
 
 		// --- Pass 2 Logic (References, Types, Counts) ---
-		const tokens = line.split(/\s+/);
+		const codeLine = stripComment(line);
+		const tokens = codeLine.split(/\s+/).filter(token => token.length > 0);
+		if (tokens.length === 0) continue; // Skip if no tokens after comment removal
+		
 		if (tokens[0].toUpperCase() === 'DB' && tokens.length >= 3) {
 			const stringPartIndex = lines[i].indexOf(tokens[2], lines[i].indexOf(tokens[0]) + tokens[0].length + 1 + tokens[1].length);
 			const stringLiteral = lines[i].substring(stringPartIndex).trim();
@@ -259,12 +286,12 @@ export async function validateTextDocument(
 			}
 			// Check Memory Address References ($)
 			else if (arg.startsWith('$')) {
-				if (!memoryAddressRegex.test(arg)) {
+				if (!isValidMemoryAddress(arg)) {
 					problems++;
 					diagnostics.push({
 						severity: DiagnosticSeverity.Error,
 						range: { start: { line: i, character: argStartIndex }, end: { line: i, character: argStartIndex + arg.length } },
-						message: `Invalid memory address format: ${arg}`, source: 'microasm-ls'
+						message: `Invalid memory address format: ${arg}. Expected $number or $[expression].`, source: 'microasm-ls'
 					});
 				} else if (!allDbAddresses.has(arg)) { // Use the combined 'allDbAddresses' map
 					if (instruction === 'OUT' && j === 1) { // Example check
@@ -283,7 +310,7 @@ export async function validateTextDocument(
 			if (arg.startsWith('#') && labelRegex.test(arg)) {
 				referencedLabels.add(arg.substring(1));
 			}
-			if (arg.startsWith('$') && memoryAddressRegex.test(arg)) {
+			if (arg.startsWith('$') && isValidMemoryAddress(arg)) {
 				referencedDbAddresses.add(arg);
 			}
 		}
@@ -324,7 +351,7 @@ export async function validateTextDocument(
 						const actualArg = args[k + 1];
 						let typeOk = false;
 						if (expectedType === 'register' && registerRegex.test(actualArg)) {typeOk = true;}
-						if (expectedType === 'memory' && memoryAddressRegex.test(actualArg)) {typeOk = true;}
+						if (expectedType === 'memory' && isValidMemoryAddress(actualArg)) {typeOk = true;}
 						// Add more types as needed
 						if (!typeOk) {
 							diagnostics.push({

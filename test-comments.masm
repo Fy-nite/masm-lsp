@@ -1,0 +1,22 @@
+; Test file for comment parsing fix and memory addressing
+MOV RAX 1        ; Move 1 to RAX
+OUT 1 $[RSP+4]   ; Output stack value - should be 2 args, not 6
+ADD RAX RBX      ; Add RBX to RAX - this should not cause extra args
+HLT              ; Halt the program
+
+; Test memory addressing modes
+MOV $123 5       ; Simple numeric address
+MOV $[RBP] 10    ; Register indirect
+MOV $[RBP-4] 20  ; Register with negative displacement
+MOV $[RAX+8] 30  ; Register with positive displacement
+MOV $[RBX+RCX*2] 40    ; Base + index*scale
+MOV $[RSP+RDI*4+16] 50 ; Complex addressing
+
+; Test invalid addressing (should show errors)
+MOV $[INVALID] 1  ; Invalid register
+MOV $[RAX*9] 1    ; Invalid scale (should be 1-8)
+MOV $[RAX+] 1     ; Incomplete expression
+
+LBL LOOP         ; Label definition
+  SUB RCX 1      ; Decrement counter
+  JNZ LOOP       ; Jump if not zero

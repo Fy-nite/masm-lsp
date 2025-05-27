@@ -1,0 +1,29 @@
+; Test file to demonstrate enhanced memory addressing support
+; Basic memory addressing (already worked)
+MOV RAX $100
+DB $200 "Hello World"
+
+; New bracket-based addressing
+MOV RAX $[RBP-4]      ; Stack variable access
+MOV RBX $[RAX+8]      ; Array element access  
+MOV RCX $[RBX+RCX*2]  ; Base + index*scale
+MOV RDX $[RSP+16]     ; Stack with positive offset
+MOV RSI $[RDI-RCX*4]  ; Complex addressing with negative component
+
+; Examples for typical assembly patterns
+PUSH RBP              ; Save old base pointer
+MOV RBP RSP           ; Set up new frame
+MOV $[RBP-4] 42       ; Store local variable
+MOV RAX $[RBP-4]      ; Load local variable
+MOV $[RBP+8] RAX      ; Store to parameter area
+
+; Array access patterns
+MOV RAX $[RBX+RCX*4]  ; Access array[index] where each element is 4 bytes
+MOV $[RDI+RSI*8] RDX  ; Store to array[index] where each element is 8 bytes
+
+; Memory operations with complex addressing
+PUSH $[RBP-8]         ; Push local variable
+OUT 1 $[RSP+4]        ; Output stack value
+
+LBL end
+HLT

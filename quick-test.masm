@@ -1,0 +1,12 @@
+; Quick test to verify comment parsing fix
+; This line should NOT cause an "OUT expects 2 arguments but got 6" error
+OUT 1 $[RSP+4] ; This comment should be ignored during parsing
+
+; Test memory addressing validation
+MOV $123 RAX          ; Simple numeric - should work
+MOV $[RBP] RAX        ; Register indirect - should work  
+MOV $[RBP-4] RAX      ; Register with displacement - should work
+MOV $[INVALID] RAX    ; Invalid register - should show error
+MOV $[RAX*9] RAX      ; Invalid scale - should show error
+
+HLT

@@ -47,12 +47,28 @@ const connection = createConnection(ProposedFeatures.all);
 // Create a simple text document manager.
 const documents = new TextDocuments(TextDocument);
 
+// Log server startup
+connection.console.log('MicroASM Language Server starting...');
+
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
 let hasDiagnosticRelatedInformationCapability = false;
+let toolchainPath: string | undefined = undefined; // Store the toolchain path
 
 connection.onInitialize((params: InitializeParams) => {
 	const capabilities = params.capabilities;
+	
+	// Extract toolchain path from initialization options
+	try {
+		if (params.initializationOptions && params.initializationOptions.toolchainPath) {
+			toolchainPath = params.initializationOptions.toolchainPath;
+			connection.console.log(`Toolchain path received: ${toolchainPath}`);
+		} else {
+			connection.console.log('No toolchain path provided in initialization options');
+		}
+	} catch (error) {
+		connection.console.error(`Error extracting toolchain path: ${error}`);
+	}
 
 	// Does the client support the `workspace/configuration` request?
 	// If not, we fall back using global settings.
@@ -248,9 +264,90 @@ const instructionDetails: Record<string, { detail: string, documentation: string
 // Regex patterns
 const labelRegex = /^#[a-zA-Z_][a-zA-Z0-9_]*$/;
 const registerRegex = /^(RAX|RBX|RCX|RDX|RSI|RDI|RBP|RSP|RIP|R[0-9]|R1[0-5])$/;
-const memoryAddressRegex = /^\$[0-9]+$/; // Simple check for $ followed by digits
+// Basic memory address regex - we'll use a function for complex validation
+const memoryAddressRegex = /^\$(?:[0-9]+|\[.+\])$/;
 const immediateValueRegex = /^[0-9]+$/; // Simple check for digits
 const includeRegex = /^#include\s+"([^"]+)"$/i; // Basic include pattern
+
+// Function to validate complex memory address expressions
+function isValidMemoryAddress(address: string): boolean {
+	if (!address.startsWith('$')) {
+		return false;
+	}
+	
+	const content = address.substring(1); // Remove the $
+	
+	// Simple numeric address: $123
+	if (/^[0-9]+$/.test(content)) {
+		return true;
+	}
+	
+	// Bracket expression: $[...]
+	if (!content.startsWith('[') || !content.endsWith(']')) {
+		return false;
+	}
+	
+	const expr = content.slice(1, -1); // Remove [ and ]
+	
+	// Empty brackets
+	if (expr.length === 0) {
+		return false;
+	}
+	
+	// Valid patterns:
+	// 1. register: rbp, rax, etc.
+	// 2. register+number: rbp+4, rax-8
+	// 3. register+register: rbp+rcx
+	// 4. register+register*scale: rbp+rcx*2
+	// 5. number: 123
+	// 6. Combinations of the above
+	
+	// Split by + and - while keeping the operators
+	const parts = expr.split(/([+\-])/).filter(part => part.length > 0);
+	
+	if (parts.length === 0) {
+		return false;
+	}
+	
+	// First part cannot be an operator
+	if (parts[0] === '+' || parts[0] === '-') {
+		return false;
+	}
+	
+	// Check each part
+	for (let i = 0; i < parts.length; i++) {
+		const part = parts[i];
+		
+		if (part === '+' || part === '-') {
+			// Operators must be followed by a value
+			if (i === parts.length - 1) {
+				return false;
+			}
+			continue;
+		}
+		
+		// Check if it's a number
+		if (/^[0-9]+$/.test(part)) {
+			continue;
+		}
+		
+		// Check if it's a register
+		if (registerRegex.test(part)) {
+			continue;
+		}
+		
+		// Check if it's a register with scale (e.g., rcx*2)
+		const scaleMatch = part.match(/^(RAX|RBX|RCX|RDX|RSI|RDI|RBP|RSP|RIP|R[0-9]|R1[0-5])\*([1-8])$/);
+		if (scaleMatch) {
+			continue;
+		}
+		
+		// Invalid part
+		return false;
+	}
+	
+	return true;
+}
 
 // --- End MicroASM Specific Data ---
 
@@ -323,6 +420,7 @@ connection.languages.diagnostics.on(async (params) => {
 				getParsedDocInfo,
 				includeRegex,
 				memoryAddressRegex,
+				isValidMemoryAddress, // Add the validation function
 				knownInstructions,
 				instructionArgCounts,
 				registerRegex,
@@ -330,7 +428,8 @@ connection.languages.diagnostics.on(async (params) => {
 				labelRegex,
 				jumpInstructions,
 				findClosestMatch,
-				mniSpecMap // Pass mniSpecMap to validation
+				mniSpecMap, // Pass mniSpecMap to validation
+				toolchainPath // Add toolchain path
 			)
 		} satisfies DocumentDiagnosticReport;
 	} else {
@@ -353,6 +452,7 @@ documents.onDidChangeContent(change => {
 		getParsedDocInfo,
 		includeRegex,
 		memoryAddressRegex,
+		isValidMemoryAddress, // Add the validation function
 		knownInstructions,
 		instructionArgCounts,
 		registerRegex,
@@ -360,7 +460,8 @@ documents.onDidChangeContent(change => {
 		labelRegex,
 		jumpInstructions,
 		findClosestMatch,
-		mniSpecMap // <-- add this argument
+		mniSpecMap, // <-- add this argument
+		toolchainPath // Add toolchain path
 	);
 });
 
@@ -376,6 +477,7 @@ connection.onDidChangeWatchedFiles(_change => {
 		getParsedDocInfo,
 		includeRegex,
 		memoryAddressRegex,
+		isValidMemoryAddress, // Add the validation function
 		knownInstructions,
 		instructionArgCounts,
 		registerRegex,
@@ -383,7 +485,8 @@ connection.onDidChangeWatchedFiles(_change => {
 		labelRegex,
 		jumpInstructions,
 		findClosestMatch,
-		mniSpecMap // <-- add this argument
+		mniSpecMap, // <-- add this argument
+		toolchainPath // Add toolchain path
 	));
 });
 
@@ -530,9 +633,9 @@ function parseDocumentRecursive(
 					if (!currentLabels.has(labelName)) { // Only store first definition within this scope
 						currentLabels.set(labelName, { line: i, uri: docUri });
 					}
-				} else if (instruction === 'DB' && tokens.length >= 3) {
+					} else if (instruction === 'DB' && tokens.length >= 3) {
 					const addressArg = tokens[1];
-					if (memoryAddressRegex.test(addressArg) && !currentDbAddresses.has(addressArg)) {
+					if (isValidMemoryAddress(addressArg) && !currentDbAddresses.has(addressArg)) {
 						const stringLiteral = line.substring(line.indexOf(tokens[2])).trim();
 						let size = 0;
 						if (stringLiteral.startsWith('"') && stringLiteral.endsWith('"')) {
@@ -691,3 +794,5 @@ documents.listen(connection);
 
 // Listen on the connection
 connection.listen();
+
+connection.console.log('MicroASM Language Server started and listening...');
