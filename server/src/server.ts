@@ -114,13 +114,13 @@ connection.onInitialize((params: InitializeParams) => {
 			documentFormattingProvider: true, // Add formatting provider
 			hoverProvider: true, // Add hover provider
 			documentSymbolProvider: true, // Add document symbol provider
-			semanticTokensProvider: {
-				legend: {
-					tokenTypes: ['instruction', 'register', 'label', 'memoryAddress', 'immediate'],
-					tokenModifiers: ['definition', 'reference', 'deprecated']
-				},
-				full: true
-			}
+			// semanticTokensProvider: {
+			// 	legend: {
+			// 		tokenTypes: ['instruction', 'register', 'label', 'memoryAddress', 'immediate'],
+			// 		tokenModifiers: ['definition', 'reference', 'deprecated']
+			// 	},
+			// 	full: true
+			// }
 		}
 	};
 	if (hasWorkspaceFolderCapability) {
