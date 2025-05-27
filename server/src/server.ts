@@ -16,13 +16,23 @@ import {
 	InitializeResult,
 	DocumentDiagnosticReportKind,
 	type DocumentDiagnosticReport,
-	Position, // Import Position
-	Range, // Import Range
-	CodeAction, // Import CodeAction
-	CodeActionKind, // Import CodeActionKind
-	CodeActionParams, // Import CodeActionParams
-	WorkspaceEdit, // Import WorkspaceEdit
-	TextEdit // Import TextEdit
+	Position,
+	Range,
+	CodeAction,
+	CodeActionKind,
+	CodeActionParams,
+	WorkspaceEdit,
+	TextEdit,
+	Location, // Add Location import
+	ReferenceParams, // Add ReferenceParams import
+	DefinitionParams, // Add DefinitionParams import
+	Hover, // Add Hover import
+	MarkupKind, // Add MarkupKind import
+	DocumentSymbol, // Add DocumentSymbol import
+	SymbolKind, // Add SymbolKind import
+	SemanticTokensBuilder,
+	SemanticTokensLegend,
+	SemanticTokensParams
 } from 'vscode-languageserver/node';
 
 import {
@@ -98,6 +108,18 @@ connection.onInitialize((params: InitializeParams) => {
 			// Announce code action capability
 			codeActionProvider: {
 				codeActionKinds: [CodeActionKind.QuickFix]
+			},
+			definitionProvider: true, // Add definition provider
+			referencesProvider: true, // Add references provider
+			documentFormattingProvider: true, // Add formatting provider
+			hoverProvider: true, // Add hover provider
+			documentSymbolProvider: true, // Add document symbol provider
+			semanticTokensProvider: {
+				legend: {
+					tokenTypes: ['instruction', 'register', 'label', 'memoryAddress', 'immediate'],
+					tokenModifiers: ['definition', 'reference', 'deprecated']
+				},
+				full: true
 			}
 		}
 	};
@@ -787,6 +809,314 @@ connection.onCompletionResolve(
 		return item;
 	}
 );
+
+// --- Go to Definition Provider ---
+connection.onDefinition((params: DefinitionParams): Location[] | undefined => {
+	const document = documents.get(params.textDocument.uri);
+	if (!document) {
+		return undefined;
+	}
+
+	const position = params.position;
+	const line = document.getText({
+		start: { line: position.line, character: 0 },
+		end: { line: position.line + 1, character: 0 }
+	});
+
+	// Get word at position
+	const wordRange = getWordRangeAtPosition(document, position);
+	if (!wordRange) {
+		return undefined;
+	}
+
+	const word = document.getText(wordRange);
+	
+	// Handle label references (#label)
+	if (word.startsWith('#')) {
+		const labelName = word.substring(1);
+		const parsedInfo = parsedDocCache.get(document.uri);
+		if (parsedInfo && parsedInfo.labels.has(labelName)) {
+			const labelDef = parsedInfo.labels.get(labelName)!;
+			return [{
+				uri: labelDef.uri,
+				range: {
+					start: { line: labelDef.line, character: 0 },
+					end: { line: labelDef.line, character: 0 }
+				}
+			}];
+		}
+	}
+
+	// Handle memory address references ($address)
+	if (word.startsWith('$')) {
+		const parsedInfo = parsedDocCache.get(document.uri);
+		if (parsedInfo && parsedInfo.dbAddresses.has(word)) {
+			const dbDef = parsedInfo.dbAddresses.get(word)!;
+			return [{
+				uri: dbDef.uri,
+				range: {
+					start: { line: dbDef.line, character: 0 },
+					end: { line: dbDef.line, character: 0 }
+				}
+			}];
+		}
+	}
+
+	return undefined;
+});
+
+// --- Find References Provider ---
+connection.onReferences((params: ReferenceParams): Location[] | undefined => {
+	const document = documents.get(params.textDocument.uri);
+	if (!document) {
+		return undefined;
+	}
+
+	const position = params.position;
+	const wordRange = getWordRangeAtPosition(document, position);
+	if (!wordRange) {
+		return undefined;
+	}
+
+	const word = document.getText(wordRange);
+	const references: Location[] = [];
+
+	// Search through all open documents
+	for (const doc of documents.all()) {
+		const text = doc.getText();
+		const lines = text.split(/\r?\n/g);
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			let searchWord = word;
+			
+			// If we're looking for a label, search for both LBL definition and #references
+			if (word.startsWith('#')) {
+				const labelName = word.substring(1);
+				// Find LBL definitions
+				const lblMatch = line.match(new RegExp(`\\bLBL\\s+(${labelName})\\b`, 'i'));
+				if (lblMatch) {
+					const startChar = line.indexOf(lblMatch[1]);
+					references.push({
+						uri: doc.uri,
+						range: {
+							start: { line: i, character: startChar },
+							end: { line: i, character: startChar + lblMatch[1].length }
+						}
+					});
+				}
+				searchWord = word; // Also search for #references
+			}
+
+			// Find all occurrences of the word
+			let index = line.indexOf(searchWord);
+			while (index !== -1) {
+				references.push({
+					uri: doc.uri,
+					range: {
+						start: { line: i, character: index },
+						end: { line: i, character: index + searchWord.length }
+					}
+				});
+				index = line.indexOf(searchWord, index + 1);
+			}
+		}
+	}
+
+	return references;
+});
+
+// Helper function to get word range at position
+function getWordRangeAtPosition(document: TextDocument, position: Position): Range | undefined {
+	const line = document.getText({
+		start: { line: position.line, character: 0 },
+		end: { line: position.line + 1, character: 0 }
+	});
+
+	const wordPattern = /[\w$#]+/g;
+	let match;
+	while ((match = wordPattern.exec(line)) !== null) {
+		const start = match.index;
+		const end = start + match[0].length;
+		if (position.character >= start && position.character <= end) {
+			return {
+				start: { line: position.line, character: start },
+				end: { line: position.line, character: end }
+			};
+		}
+	}
+	return undefined;
+}
+
+// --- Hover Provider ---
+connection.onHover((params): Hover | undefined => {
+	const document = documents.get(params.textDocument.uri);
+	if (!document) {
+		return undefined;
+	}
+
+	const position = params.position;
+	const wordRange = getWordRangeAtPosition(document, position);
+	if (!wordRange) {
+		return undefined;
+	}
+
+	const word = document.getText(wordRange);
+
+	// Check if it's an instruction
+	const instructionInfo = instructionDetails[word.toUpperCase()];
+	if (instructionInfo) {
+		return {
+			contents: {
+				kind: MarkupKind.Markdown,
+				value: `**${word.toUpperCase()}**\n\n${instructionInfo.detail}\n\n${instructionInfo.documentation}`
+			},
+			range: wordRange
+		};
+	}
+
+	// Check if it's a register
+	if (knownRegisters.has(word.toUpperCase())) {
+		let description = `General purpose register: ${word.toUpperCase()}`;
+		if (word.toUpperCase() === 'RSP') description = 'Stack Pointer Register - Points to the top of the stack';
+		if (word.toUpperCase() === 'RBP') description = 'Base Pointer Register - Points to the base of the current stack frame';
+		if (word.toUpperCase() === 'RIP') description = 'Instruction Pointer Register - Holds the address of the next instruction';
+
+		return {
+			contents: {
+				kind: MarkupKind.Markdown,
+				value: `**Register: ${word.toUpperCase()}**\n\n${description}`
+			},
+			range: wordRange
+		};
+	}
+
+	// Check if it's a label reference
+	if (word.startsWith('#')) {
+		const labelName = word.substring(1);
+		const parsedInfo = parsedDocCache.get(document.uri);
+		if (parsedInfo && parsedInfo.labels.has(labelName)) {
+			const labelDef = parsedInfo.labels.get(labelName)!;
+			return {
+				contents: {
+					kind: MarkupKind.Markdown,
+					value: `**Label: ${word}**\n\nDefined at line ${labelDef.line + 1} in ${labelDef.uri}`
+				},
+				range: wordRange
+			};
+		}
+	}
+
+	// Check if it's a memory address
+	if (word.startsWith('$')) {
+		const parsedInfo = parsedDocCache.get(document.uri);
+		if (parsedInfo && parsedInfo.dbAddresses.has(word)) {
+			const dbDef = parsedInfo.dbAddresses.get(word)!;
+			return {
+				contents: {
+					kind: MarkupKind.Markdown,
+					value: `**Memory Address: ${word}**\n\nDefined at line ${dbDef.line + 1}, size: ${dbDef.size} bytes`
+				},
+				range: wordRange
+			};
+		}
+	}
+
+	return undefined;
+});
+
+// --- Document Symbol Provider ---
+connection.onDocumentSymbol((params): DocumentSymbol[] | undefined => {
+	const document = documents.get(params.textDocument.uri);
+	if (!document) {
+		return undefined;
+	}
+
+	const symbols: DocumentSymbol[] = [];
+	const text = document.getText();
+	const lines = text.split(/\r?\n/g);
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i].trim();
+		if (line.length === 0 || line.startsWith(';')) {
+			continue;
+		}
+
+		const tokens = line.split(/\s+/);
+		const instruction = tokens[0].toUpperCase();
+
+		// Labels
+		if (instruction === 'LBL' && tokens.length > 1) {
+			const labelName = tokens[1];
+			symbols.push({
+				name: labelName,
+				kind: SymbolKind.Function,
+				range: {
+					start: { line: i, character: 0 },
+					end: { line: i, character: line.length }
+				},
+				selectionRange: {
+					start: { line: i, character: line.indexOf(labelName) },
+					end: { line: i, character: line.indexOf(labelName) + labelName.length }
+				}
+			});
+		}
+
+		// Data definitions
+		if (instruction === 'DB' && tokens.length >= 3) {
+			const address = tokens[1];
+			symbols.push({
+				name: `Data at ${address}`,
+				kind: SymbolKind.Variable,
+				range: {
+					start: { line: i, character: 0 },
+					end: { line: i, character: line.length }
+				},
+				selectionRange: {
+					start: { line: i, character: line.indexOf(address) },
+					end: { line: i, character: line.indexOf(address) + address.length }
+				}
+			});
+		}
+
+		// STATE variables
+		if (instruction === 'STATE' && tokens.length >= 3) {
+			const varName = tokens[1];
+			const varType = tokens[2];
+			symbols.push({
+				name: `${varName} ${varType}`,
+				kind: SymbolKind.Variable,
+				range: {
+					start: { line: i, character: 0 },
+					end: { line: i, character: line.length }
+				},
+				selectionRange: {
+					start: { line: i, character: line.indexOf(varName) },
+					end: { line: i, character: line.indexOf(varName) + varName.length }
+				}
+			});
+		}
+
+		// Macros
+		if (instruction === 'MACRO' && tokens.length > 1) {
+			const macroName = tokens[1];
+			symbols.push({
+				name: macroName,
+				kind: SymbolKind.Class,
+				range: {
+					start: { line: i, character: 0 },
+					end: { line: i, character: line.length }
+				},
+				selectionRange: {
+					start: { line: i, character: line.indexOf(macroName) },
+					end: { line: i, character: line.indexOf(macroName) + macroName.length }
+				}
+			});
+		}
+	}
+
+	return symbols;
+});
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events

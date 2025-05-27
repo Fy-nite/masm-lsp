@@ -1,35 +1,35 @@
 {
-	"name": "macrolsp",
-	"description": "the official Micro-Assembly Language Server",
-	"author": "charlie-sans",
-	"license": "MIT",
+	"name": "microasm-lsp",
+	"displayName": "MicroASM Language Server",
+	"description": "Language Server for MicroASM assembly language",
 	"version": "1.0.0",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Fy-nite/MicroASM-Language-Server"
-	},
 	"publisher": "charlie-sans",
-	"categories": [],
-	"keywords": [
-		"multi-root ready"
-	],
 	"engines": {
 		"vscode": "^1.75.0"
 	},
-	"activationEvents": [
-		"onLanguage:microasm"
+	"categories": [
+		"Programming Languages"
 	],
-	"main": "./client/out/extension",
+	"icon": "icon..png",
 	"contributes": {
 		"languages": [{
 			"id": "microasm",
 			"aliases": ["MicroASM", "microasm"],
-			"extensions": [".masm", ".uasm"],
-			"configuration": "./language-configuration.json"
+			"extensions": [".masm", ".mas", ".uasm"],
+			"configuration": "./language-configuration.json",
+			"icon": {
+				"light": "./icon.png",
+				"dark": "./icon.png"
+			}
+		}],
+		"grammars": [{
+			"language": "microasm",
+			"scopeName": "source.microasm",
+			"path": "./syntaxes/microasm.tmLanguage.json"
 		}],
 		"configuration": {
 			"type": "object",
-			"title": "MicroASM Configuration",
+			"title": "MicroASM",
 			"properties": {
 				"microasm.maxNumberOfProblems": {
 					"scope": "resource",
@@ -40,7 +40,7 @@
 				"microasm.includePath": {
 					"scope": "resource",
 					"type": "string",
-					"description": "Path to the include directory for MicroASM files."
+					"description": "Path to search for include files."
 				},
 				"microasm.toolchainPath": {
 					"scope": "resource",
@@ -61,6 +61,7 @@
 			}
 		}
 	},
+	"main": "./client/out/extension",
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -b",

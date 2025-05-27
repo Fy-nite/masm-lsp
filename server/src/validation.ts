@@ -174,18 +174,26 @@ export async function validateTextDocument(
 		if (!knownInstructions.has(instruction)) {
 			problems++;
 			let message = `Unknown instruction: ${tokens[0]}`;
+			let detail = `Valid instructions include: MOV, ADD, SUB, JMP, etc.`;
+			
 			const suggestion = findClosestMatch(tokens[0], knownInstructions);
-			const data: { suggestion?: string } = {}; // Prepare data object
+			const data: { suggestion?: string } = {};
 			if (suggestion) {
 				message += `. Did you mean '${suggestion}'?`;
-				data.suggestion = suggestion; // Store suggestion in data
+				data.suggestion = suggestion;
+				detail = `Example: ${getInstructionExample(suggestion)}`;
 			}
+			
 			diagnostics.push({
 				severity: DiagnosticSeverity.Error,
 				range: { start: { line: i, character: lines[i].indexOf(tokens[0]) }, end: { line: i, character: lines[i].indexOf(tokens[0]) + tokens[0].length } },
 				message: message,
 				source: 'microasm-ls',
-				data: data // Attach data to diagnostic
+				data: data,
+				relatedInformation: [{
+					location: { uri: textDocument.uri, range: { start: { line: i, character: 0 }, end: { line: i, character: 0 } } },
+					message: detail
+				}]
 			});
 			continue;
 		}
@@ -403,4 +411,14 @@ export async function validateTextDocument(
 
 	// Use settings.maxNumberOfProblems which is now guaranteed to exist
 	return finalDiagnostics.slice(0, settings.maxNumberOfProblems); // Ensure limit isn't exceeded
+}
+
+function getInstructionExample(instruction: string): string {
+    const examples: Record<string, string> = {
+        'MOV': 'MOV RAX RBX  ; Copy value from RBX to RAX',
+        'ADD': 'ADD RAX 10   ; Add 10 to RAX',
+        'JMP': 'JMP #label   ; Jump to label',
+        // ...add more examples
+    };
+    return examples[instruction] || `${instruction} arg1 arg2`;
 }

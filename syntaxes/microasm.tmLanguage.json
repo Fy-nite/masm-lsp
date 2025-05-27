@@ -1,0 +1,176 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "MicroASM",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#labels"
+		},
+		{
+			"include": "#instructions"
+		},
+		{
+			"include": "#registers"
+		},
+		{
+			"include": "#memory-addresses"
+		},
+		{
+			"include": "#label-references"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#numbers"
+		},
+		{
+			"include": "#directives"
+		}
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.semicolon.microasm",
+					"match": ";.*$"
+				}
+			]
+		},
+		"labels": {
+			"patterns": [
+				{
+					"name": "entity.name.function.label.microasm",
+					"match": "(?i)\\b(LBL)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b",
+					"captures": {
+						"1": {
+							"name": "keyword.control.label.microasm"
+						},
+						"2": {
+							"name": "entity.name.function.microasm"
+						}
+					}
+				}
+			]
+		},
+		"instructions": {
+			"patterns": [
+				{
+					"name": "keyword.control.flow.microasm",
+					"match": "(?i)\\b(JMP|JE|JNE|JL|JG|JLE|JGE|JZ|JNZ|JS|JNS|JC|JNC|JB|JAE|JO|JNO|CALL|RET)\\b"
+				},
+				{
+					"name": "keyword.control.microasm",
+					"match": "(?i)\\b(HLT|EXIT)\\b"
+				},
+				{
+					"name": "keyword.operator.arithmetic.microasm",
+					"match": "(?i)\\b(MOV|MOVZX|MOVSX|ADD|SUB|MUL|DIV|INC|DEC|AND|OR|XOR|NOT|SHL|SHR|SAR)\\b"
+				},
+				{
+					"name": "keyword.operator.stack.microasm",
+					"match": "(?i)\\b(PUSH|POP|ENTER|LEAVE)\\b"
+				},
+				{
+					"name": "keyword.operator.io.microasm",
+					"match": "(?i)\\b(IN|OUT|COUT)\\b"
+				},
+				{
+					"name": "keyword.operator.memory.microasm",
+					"match": "(?i)\\b(MOVADDR|MOVTO|COPY|FILL|CMP|CMP_MEM|MALLOC|FREE)\\b"
+				},
+				{
+					"name": "keyword.operator.system.microasm",
+					"match": "(?i)\\b(ARGC|GETARG|SYSCALL)\\b"
+				},
+				{
+					"name": "keyword.operator.mni.microasm",
+					"match": "(?i)\\b(MNI)\\b"
+				}
+			]
+		},
+		"registers": {
+			"patterns": [
+				{
+					"name": "variable.language.register.microasm",
+					"match": "(?i)\\b(RAX|RBX|RCX|RDX|RSI|RDI|RBP|RSP|RIP|R[0-9]|R1[0-5]|FPR[0-9]|FPR1[0-5])\\b"
+				}
+			]
+		},
+		"memory-addresses": {
+			"patterns": [
+				{
+					"name": "variable.other.memory.microasm",
+					"match": "\\$\\[([^\\]]+)\\]",
+					"captures": {
+						"1": {
+							"name": "meta.memory.expression.microasm"
+						}
+					}
+				},
+				{
+					"name": "variable.other.memory.microasm",
+					"match": "\\$[0-9A-Fa-f]+"
+				},
+				{
+					"name": "variable.other.memory.register.microasm",
+					"match": "(?i)\\$(RAX|RBX|RCX|RDX|RSI|RDI|RBP|RSP|RIP|R[0-9]|R1[0-5])"
+				}
+			]
+		},
+		"label-references": {
+			"patterns": [
+				{
+					"name": "variable.other.label.microasm",
+					"match": "#[a-zA-Z_][a-zA-Z0-9_]*"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.double.microasm",
+					"begin": "\"",
+					"end": "\"",
+					"patterns": [
+						{
+							"name": "constant.character.escape.microasm",
+							"match": "\\\\."
+						}
+					]
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"name": "constant.numeric.hex.microasm",
+					"match": "\\b0[xX][0-9A-Fa-f]+\\b"
+				},
+				{
+					"name": "constant.numeric.decimal.microasm",
+					"match": "\\b[0-9]+\\b"
+				},
+				{
+					"name": "constant.numeric.float.microasm",
+					"match": "\\b[0-9]+\\.[0-9]+([eE][+-]?[0-9]+)?\\b"
+				}
+			]
+		},
+		"directives": {
+			"patterns": [
+				{
+					"name": "keyword.control.directive.microasm",
+					"match": "(?i)\\b(DB|DW|DD|DQ|DF|DDbl|RESB|RESW|RESD|RESQ|RESF|RESDbl|STATE|MACRO|ENDMACRO|SCOPE|ENDSCOPE)\\b"
+				},
+				{
+					"name": "keyword.control.include.microasm",
+					"match": "(?i)#include\\s+[\"<][^\"<>]+[\">]"
+				}
+			]
+		}
+	},
+	"scopeName": "source.microasm"
+}

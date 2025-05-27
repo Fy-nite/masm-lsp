@@ -7,8 +7,57 @@
 		["(", ")"]
 	],
 	"autoClosingPairs": [
-		{ "open": "\"", "close": "\"" },
-		{ "open": "[", "close": "]" },
-		{ "open": "(", "close": ")" }
+		["[", "]"],
+		["(", ")"],
+		["\"", "\""]
+	],
+	"surroundingPairs": [
+		["[", "]"],
+		["(", ")"],
+		["\"", "\""]
+	],
+	"wordPattern": "\\b[a-zA-Z_$#][a-zA-Z0-9_]*\\b",
+	"indentationRules": {
+		"increaseIndentPattern": "^\\s*(LBL\\s+\\w+\\s+SCOPE|MACRO\\s+\\w+).*$",
+		"decreaseIndentPattern": "^\\s*(ENDSCOPE|ENDMACRO).*$"
+	},
+	"folding": {
+		"markers": {
+			"start": "^\\s*(LBL\\s+\\w+\\s+SCOPE|MACRO\\s+\\w+)",
+			"end": "^\\s*(ENDSCOPE|ENDMACRO)"
+		}
+	},
+	"snippets": [
+		{
+			"prefix": "main",
+			"body": [
+				"LBL main",
+				"\t$0",
+				"\tHLT"
+			],
+			"description": "Main function template"
+		},
+		{
+			"prefix": "func",
+			"body": [
+				"LBL $1",
+				"\tENTER $2",
+				"\t$0",
+				"\tLEAVE",
+				"\tRET"
+			],
+			"description": "Function template with stack frame"
+		},
+		{
+			"prefix": "loop",
+			"body": [
+				"MOV $1 $2",
+				"LBL ${3:loop_start}",
+				"\t$0",
+				"\tDEC $1",
+				"\tJNZ #$3"
+			],
+			"description": "Simple loop template"
+		}
 	]
 }

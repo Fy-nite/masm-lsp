@@ -1,0 +1,47 @@
+<!-- filepath: d:\masm-lsp\icon.svg -->
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="#2D5A8B" stroke="#1E3A5F" stroke-width="2"/>
+  
+  <!-- Microchip outline -->
+  <rect x="24" y="24" width="80" height="80" fill="#E8E8E8" stroke="#444" stroke-width="2" rx="4"/>
+  
+  <!-- Pin connectors on sides -->
+  <rect x="16" y="32" width="8" height="4" fill="#666"/>
+  <rect x="16" y="40" width="8" height="4" fill="#666"/>
+  <rect x="16" y="48" width="8" height="4" fill="#666"/>
+  <rect x="16" y="56" width="8" height="4" fill="#666"/>
+  <rect x="16" y="64" width="8" height="4" fill="#666"/>
+  <rect x="16" y="72" width="8" height="4" fill="#666"/>
+  <rect x="16" y="80" width="8" height="4" fill="#666"/>
+  <rect x="16" y="88" width="8" height="4" fill="#666"/>
+  
+  <rect x="104" y="32" width="8" height="4" fill="#666"/>
+  <rect x="104" y="40" width="8" height="4" fill="#666"/>
+  <rect x="104" y="48" width="8" height="4" fill="#666"/>
+  <rect x="104" y="56" width="8" height="4" fill="#666"/>
+  <rect x="104" y="64" width="8" height="4" fill="#666"/>
+  <rect x="104" y="72" width="8" height="4" fill="#666"/>
+  <rect x="104" y="80" width="8" height="4" fill="#666"/>
+  <rect x="104" y="88" width="8" height="4" fill="#666"/>
+  
+  <!-- Inner circuit pattern -->
+  <rect x="32" y="32" width="64" height="64" fill="#D0D0D0" stroke="#888" stroke-width="1" rx="2"/>
+  
+  <!-- Circuit lines -->
+  <line x1="40" y1="40" x2="88" y2="40" stroke="#4A90E2" stroke-width="2"/>
+  <line x1="40" y1="48" x2="88" y2="48" stroke="#4A90E2" stroke-width="2"/>
+  <line x1="40" y1="56" x2="88" y2="56" stroke="#4A90E2" stroke-width="2"/>
+  <line x1="40" y1="64" x2="88" y2="64" stroke="#4A90E2" stroke-width="2"/>
+  <line x1="40" y1="72" x2="88" y2="72" stroke="#4A90E2" stroke-width="2"/>
+  <line x1="40" y1="80" x2="88" y2="80" stroke="#4A90E2" stroke-width="2"/>
+  <line x1="40" y1="88" x2="88" y2="88" stroke="#4A90E2" stroke-width="2"/>
+  
+  <!-- Vertical circuit lines -->
+  <line x1="48" y1="40" x2="48" y2="88" stroke="#4A90E2" stroke-width="1"/>
+  <line x1="64" y1="40" x2="64" y2="88" stroke="#4A90E2" stroke-width="1"/>
+  <line x1="80" y1="40" x2="80" y2="88" stroke="#4A90E2" stroke-width="1"/>
+  
+  <!-- μASM text -->
+  <text x="64" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#1E3A5F">μASM</text>
+</svg>
